@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trial Notes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F5F8FA; --sheet:#FFFFFF; --ink:#1B2A4A; --muted:#5B6B85; --rule:#D9E2EC; --grid:#E8EEF4;
+  --hl:#FFE45C; --ok:#1E8E5A; --warn:#C77700; --bad:#C23B3B; --focus:#2F6FEB;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --paper:#0F1726; --sheet:#16213A; --ink:#E4EAF5; --muted:#9AA8C2; --rule:#2A3756; --grid:#1B2844;
+  --hl:#8A7410; --ok:#4CC38A; --warn:#F0A43A; --bad:#F07070; --focus:#7AA7FF;}}
+:root[data-theme="dark"]{--paper:#0F1726; --sheet:#16213A; --ink:#E4EAF5; --muted:#9AA8C2; --rule:#2A3756; --grid:#1B2844; --hl:#8A7410; --ok:#4CC38A; --warn:#F0A43A; --bad:#F07070; --focus:#7AA7FF;}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.55 "Atkinson Hyperlegible",system-ui,sans-serif;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+h1,h2,h3{font-family:"Bricolage Grotesque",system-ui,sans-serif;margin:0;line-height:1.15}
+h1{font-size:clamp(1.8rem,5vw,2.6rem);font-weight:800}
+h2{font-size:1.35rem;font-weight:600}
+h3{font-size:1.05rem;font-weight:600}
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 80px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.crumb{color:var(--muted);font-size:.95rem}
+.crumb button{background:none;border:0;color:var(--focus);font:inherit;padding:0;cursor:pointer;text-decoration:underline}
+.save{margin-left:auto;font-size:.85rem;color:var(--muted)}
+.sheet{background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:18px;margin-bottom:16px}
+.sheet>h2{margin-bottom:12px}
+.hint{color:var(--muted);font-size:.9rem;margin:2px 0 10px}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--ink);color:var(--sheet);border:0;border-radius:8px;padding:9px 14px;font-weight:700}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--rule)}
+.btn.small{padding:5px 10px;font-size:.88rem}
+.btn:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,.row:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+input,textarea,select{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:6px;padding:8px 10px;width:100%}
+textarea{resize:vertical;min-height:42px}
+label.f{display:block;margin-bottom:10px}
+label.f span{display:block;font-weight:700;font-size:.9rem;margin-bottom:3px}
+.row{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--rule);border-radius:8px;margin-bottom:8px;background:var(--sheet);cursor:pointer;width:100%;text-align:left;color:inherit}
+.row:hover{border-color:var(--muted)}
+.row .n{font-family:"Bricolage Grotesque";font-weight:800;font-size:1.4rem;min-width:2.2ch}
+.row .meta{color:var(--muted);font-size:.88rem}
+.grow{flex:1;min-width:0}
+.tabs{display:flex;gap:6px;margin-bottom:14px}
+.tabs button{border:1px solid var(--rule);background:var(--sheet);color:var(--ink);border-radius:999px;padding:6px 14px}
+.tabs button[aria-selected="true"]{background:var(--ink);color:var(--sheet);border-color:var(--ink)}
+.step{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:12px 0;border-top:1px dashed var(--rule)}
+.step:first-of-type{border-top:0}
+.step .num{font-family:"Bricolage Grotesque";font-weight:800;font-size:1.5rem;text-align:center;padding-top:4px}
+.step.changed .num{background:var(--hl);border-radius:6px;color:#1B2A4A}
+.step .cols{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.step .tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;align-items:center}
+.mark{border:1px solid var(--rule);background:var(--paper);border-radius:6px;padding:3px 8px;font-size:.85rem;color:var(--ink)}
+.mark[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--sheet)}
+.status{display:inline-block;font-size:.85rem;font-weight:700;padding:2px 8px;border-radius:999px;border:1px solid currentColor}
+.s-success{color:var(--ok)} .s-partial{color:var(--warn)} .s-failed{color:var(--bad)} .s-open{color:var(--muted)}
+.read{border-left:4px solid var(--hl);background:var(--sheet)}
+.read dl{margin:0} .read dt{font-weight:700;margin-top:8px} .read dd{margin:0;color:var(--muted);white-space:pre-wrap}
+.list-item{display:flex;gap:8px;margin-bottom:6px;align-items:center}
+.list-item input{flex:1}
+.x{background:none;border:0;color:var(--muted);font-size:1.2rem;padding:4px 8px}
+.upd{border-left:3px solid var(--rule);padding:4px 10px;margin-bottom:6px;white-space:pre-wrap}
+.upd small{color:var(--muted);display:block}
+.empty{text-align:center;padding:30px 10px;color:var(--muted)}
+.hero{margin-bottom:22px}
+.hero p{color:var(--muted);max-width:56ch;margin:6px 0 0}
+.newp{display:flex;gap:8px}
+.cycle{font-size:.9rem;color:var(--muted);margin-top:10px}
+@media (max-width:600px){.step .cols{grid-template-columns:1fr}.step{grid-template-columns:34px 1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+const $app=document.getElementById('app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4);
+const today=()=>new Date().toISOString().slice(0,10);
+const MARKS=[['changed','✏️ Changed'],['problem','⚠️ Problem'],['worked','✅ Worked'],['failed','❌ Failed']];
+const STATUS={open:'In progress',success:'✅ Success',partial:'⚠️ Partial',failed:'❌ Failed'};
+
+/* ---------- storage: claude db if available, else localStorage ---------- */
+let db=null, userId=null, projects={}, view={name:'home'}, saveTimers={};
+const LS='trialnotes.v1';
+function lsLoad(){try{return JSON.parse(localStorage.getItem(LS)||'{}')}catch(e){return{}}}
+function lsSave(){try{localStorage.setItem(LS,JSON.stringify(projects))}catch(e){}}
+function setSaveState(t){const el=document.getElementById('save');if(el)el.textContent=t}
+function save(pid){
+  setSaveState('Saving…');
+  clearTimeout(saveTimers[pid]);
+  saveTimers[pid]=setTimeout(async()=>{
+    lsSave();
+    if(db&&userId){
+      try{
+        const p=projects[pid];
+        if(p) await db.collection('data/users/'+userId).doc(pid).set(JSON.parse(JSON.stringify(p)));
+        else await db.collection('data/users/'+userId).doc(pid).delete();
+        setSaveState('Saved');
+      }catch(e){setSaveState('Saved on this device only')}
+    } else setSaveState('Saved on this device');
+  },700);
+}
+async function initStore(){
+  projects=lsLoad(); render();
+  try{
+    if(!window.claude||!window.claude.use) return;
+    const [d,u]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+    if(!d||!u) return;
+    const id=await u.id(); if(!id) return;
+    db=d; userId=id;
+    const snap=await db.collection('data/users/'+userId).get();
+    const remote={};
+    snap.forEach?snap.forEach(s=>{remote[s.id]=s.data()}):(snap.docs||[]).forEach(s=>{remote[s.id]=s.data()});
+    if(Object.keys(remote).length){projects=JSON.parse(JSON.stringify(remote));lsSave()}
+    else if(Object.keys(projects).length){Object.keys(projects).forEach(save)}
+    render();
+  }catch(e){}
+}
+
+/* ---------- model helpers ---------- */
+const blankGoals=()=>({test:'',change:'',keep:'',success:''});
+const blankOut=()=>({status:'open',result:'',met:'',worked:'',problem:'',why:'',next:''});
+const blankStep=(did='')=>({did,happened:'',marks:[]});
+function newProject(name){
+  const p={id:uid(),name,created:today(),experiments:[],summary:{best:[],lessons:[],questions:[]}};
+  projects[p.id]=p; save(p.id); return p;
+}
+function newExperiment(p,copy){
+  const prev=p.experiments[p.experiments.length-1];
+  const e={id:uid(),n:p.experiments.length+1,date:today(),goals:blankGoals(),
+    steps:copy&&prev?prev.steps.map(s=>blankStep(s.did)):Array.from({length:5},()=>blankStep()),
+    out:blankOut(),updates:[]};
+  if(copy&&prev&&prev.out.next) e.goals.test=prev.out.next;
+  p.experiments.push(e); save(p.id); return e;
+}
+function getPath(obj,path){return path.split('.').reduce((o,k)=>o?.[k],obj)}
+function setPath(obj,path,v){const ks=path.split('.');const last=ks.pop();const t=ks.reduce((o,k)=>o[k],obj);t[last]=v}
+function changedSteps(e){return e.steps.map((s,i)=>s.marks.includes('changed')?i+1:null).filter(Boolean)}
+
+/* ---------- views ---------- */
+function go(v){view=v;render();window.scrollTo(0,0)}
+function header(crumbs){
+  return `<div class="top"><div class="crumb">${crumbs}</div><div class="save" id="save" aria-live="polite"></div></div>`;
+}
+function render(){
+  if(view.name==='home') return renderHome();
+  const p=projects[view.pid]; if(!p){view={name:'home'};return renderHome()}
+  if(view.name==='project') return renderProject(p);
+  const e=p.experiments.find(x=>x.id===view.eid); if(!e) return go({name:'project',pid:p.id,tab:'experiments'});
+  renderExperiment(p,e);
+}
+function renderHome(){
+  const list=Object.values(projects).sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+  $app.innerHTML=`${header('')}
+  <div class="hero"><h1>Trial Notes</h1>
+    <p>Keep clean notes while you learn by trial and error. Every experiment gets goals, steps, and output notes, and every project keeps a running summary.</p>
+    <div class="cycle">Read old notes, set goals, log steps, write output notes, update the summary. Repeat.</div></div>
+  <div class="sheet"><h2>Start a project</h2>
+    <div class="newp"><input id="pname" placeholder="What are you working on? e.g. Sourdough bread" aria-label="Project name">
+    <button class="btn" id="addp">Create project</button></div></div>
+  <div class="sheet"><h2>Your projects</h2>
+    ${list.length?list.map(p=>{const last=p.experiments[p.experiments.length-1];
+      return `<button class="row" data-open="${p.id}"><div class="grow"><h3>${esc(p.name)}</h3>
+      <div class="meta">${p.experiments.length} experiment${p.experiments.length===1?'':'s'}${last?` · last ${esc(last.date)}`:''}</div></div>
+      ${last?`<span class="status s-${last.out.status}">${STATUS[last.out.status]}</span>`:''}</button>`}).join('')
+      :'<div class="empty">No projects yet. Name one above to get started.</div>'}
+  </div>`;
+  const add=()=>{const n=document.getElementById('pname').value.trim();if(!n)return document.getElementById('pname').focus();const p=newProject(n);go({name:'project',pid:p.id,tab:'experiments'})};
+  document.getElementById('addp').onclick=add;
+  document.getElementById('pname').onkeydown=ev=>{if(ev.key==='Enter')add()};
+  $app.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>go({name:'project',pid:b.dataset.open,tab:'experiments'}));
+}
+function readFirst(p){
+  const last=p.experiments[p.experiments.length-1];
+  if(!last) return '';
+  const lessons=p.summary.lessons.filter(l=>l.text).map(l=>'• '+l.text).join('\n');
+  const qs=p.summary.questions.filter(q=>q.text&&q.status!=='answered').map(q=>'• '+q.text).join('\n');
+  return `<div class="sheet read"><h2>Read before your next experiment</h2>
+    <dl><dt>Last result (Experiment ${last.n})</dt><dd>${STATUS[last.out.status]}${last.out.result?' — '+esc(last.out.result):''}</dd>
+    <dt>Main problem</dt><dd>${esc(last.out.problem)||'—'}</dd>
+    <dt>What to change next</dt><dd>${esc(last.out.next)||'—'}</dd>
+    <dt>Lessons learned</dt><dd>${esc(lessons)||'—'}</dd>
+    <dt>Open questions</dt><dd>${esc(qs)||'—'}</dd></dl></div>`;
+}
+function renderProject(p){
+  const tab=view.tab||'experiments';
+  $app.innerHTML=`${header(`<button data-home>Projects</button> / ${esc(p.name)}`)}
+  <h1 style="margin-bottom:14px">${esc(p.name)}</h1>
+  <div class="tabs" role="tablist">
+    <button role="tab" aria-selected="${tab==='experiments'}" data-tab="experiments">Experiments</button>
+    <button role="tab" aria-selected="${tab==='summary'}" data-tab="summary">Summary</button></div>
+  <div id="tabbody"></div>`;
+  $app.querySelector('[data-home]').onclick=()=>go({name:'home'});
+  $app.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>go({name:'project',pid:p.id,tab:b.dataset.tab}));
+  const body=document.getElementById('tabbody');
+  if(tab==='experiments'){
+    const has=p.experiments.length>0;
+    body.innerHTML=`${readFirst(p)}
+    <div class="sheet"><h2>Start experiment ${p.experiments.length+1}</h2>
+      <p class="hint">${has?'Copying keeps your steps from the last experiment, so you only mark what you change.':'Your first experiment is the baseline.'}</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      ${has?'<button class="btn" data-new="copy">Copy steps from last experiment</button><button class="btn ghost" data-new="blank">Start blank</button>':'<button class="btn" data-new="blank">Start experiment 1</button>'}</div></div>
+    <div class="sheet"><h2>Experiment index</h2>
+    ${has?[...p.experiments].reverse().map(e=>{const ch=changedSteps(e);
+      return `<button class="row" data-exp="${e.id}"><span class="n">${e.n}</span><div class="grow">
+      <div>${esc(e.goals.test)||'<span class="meta">No goal written</span>'}</div>
+      <div class="meta">${esc(e.date)}${ch.length?` · changed step${ch.length>1?'s':''} ${ch.join(', ')}`:''}</div></div>
+      <span class="status s-${e.out.status}">${STATUS[e.out.status]}</span></button>`}).join('')
+      :'<div class="empty">No experiments yet.</div>'}
+    </div>
+    <div style="text-align:right"><button class="btn ghost small" data-delp>Delete project</button></div>`;
+    body.querySelectorAll('[data-new]').forEach(b=>b.onclick=()=>{const e=newExperiment(p,b.dataset.new==='copy');go({name:'exp',pid:p.id,eid:e.id})});
+    body.querySelectorAll('[data-exp]').forEach(b=>b.onclick=()=>go({name:'exp',pid:p.id,eid:b.dataset.exp}));
+    body.querySelector('[data-delp]').onclick=()=>{if(confirm(`Delete "${p.name}" and all its experiments? This can't be undone.`)){delete projects[p.id];save(p.id);go({name:'home'})}};
+  } else renderSummary(p,body);
+}
+function listEditor(key,items,fields,addLabel){
+  return `${items.map((it,i)=>`<div class="list-item">${fields.map(f=>f.opts
+      ?`<select data-k="summary.${key}.${i}.${f.k}" aria-label="${f.label}" style="width:auto">${f.opts.map(o=>`<option value="${o[0]}" ${it[f.k]===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>`
+      :`<input data-k="summary.${key}.${i}.${f.k}" value="${esc(it[f.k])}" placeholder="${f.ph}" aria-label="${f.label}" ${f.w?`style="flex:0 0 ${f.w}"`:''}>`).join('')}
+      <button class="x" data-del="${key}.${i}" aria-label="Remove">×</button></div>`).join('')}
+    <button class="btn ghost small" data-add="${key}">+ ${addLabel}</button>`;
+}
+function renderSummary(p,body){
+  const s=p.summary;
+  body.innerHTML=`
+  <div class="sheet"><h2>Current best version</h2><p class="hint">The settings or method that has worked best so far.</p>
+    ${listEditor('best',s.best,[{k:'item',ph:'Item, e.g. Water',label:'Item',w:'34%'},{k:'text',ph:'Setting, e.g. 325g per 500g flour',label:'Setting'}],'Add item')}</div>
+  <div class="sheet"><h2>Lessons learned</h2><p class="hint">One line each. Merge duplicates every few experiments.</p>
+    ${listEditor('lessons',s.lessons,[{k:'text',ph:'e.g. An active starter matters most',label:'Lesson'},{k:'kind',label:'Type',opts:[['works','Works'],['doesnt',"Doesn't work"]]}],'Add lesson')}</div>
+  <div class="sheet"><h2>Open questions</h2><p class="hint">Things you're not sure about yet.</p>
+    ${listEditor('questions',s.questions,[{k:'text',ph:'e.g. Would a longer rise lighten the crumb?',label:'Question'},{k:'status',label:'Status',opts:[['open','Open'],['answered','Answered']]}],'Add question')}</div>`;
+  bindInputs(p,body);
+  const defaults={best:{item:'',text:''},lessons:{text:'',kind:'works'},questions:{text:'',status:'open'}};
+  body.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{s[b.dataset.add].push({...defaults[b.dataset.add]});save(p.id);renderSummary(p,body);
+    const ins=body.querySelectorAll(`[data-k^="summary.${b.dataset.add}."]`);ins[ins.length-1]?.focus()});
+  body.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const [k,i]=b.dataset.del.split('.');s[k].splice(+i,1);save(p.id);renderSummary(p,body)});
+}
+function bindInputs(root,scope){
+  scope.querySelectorAll('[data-k]').forEach(el=>{
+    const h=()=>{setPath(root,el.dataset.k,el.value);save(root.id)};
+    el.addEventListener('input',h); if(el.tagName==='SELECT') el.addEventListener('change',h);
+  });
+}
+function field(base,key,label,ph,area=true){
+  return `<label class="f"><span>${label}</span>${area
+    ?`<textarea data-k="${base}.${key}" rows="2" placeholder="${esc(ph)}">${esc(getPath(curP,base+'.'+key))}</textarea>`
+    :`<input data-k="${base}.${key}" value="${esc(getPath(curP,base+'.'+key))}" placeholder="${esc(ph)}">`}</label>`;
+}
+let curP=null;
+function renderExperiment(p,e){
+  curP=p; const ei=p.experiments.indexOf(e); const b=`experiments.${ei}`;
+  $app.innerHTML=`${header(`<button data-home>Projects</button> / <button data-proj>${esc(p.name)}</button> / Experiment ${e.n}`)}
+  <div style="display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-bottom:14px">
+    <h1>Experiment ${e.n}</h1>
+    <label style="margin-left:auto"><span class="hint" style="display:block;margin:0">Date</span><input type="date" data-k="${b}.date" value="${esc(e.date)}" style="width:auto"></label></div>
+  ${ei>0?readFirst({...p,experiments:p.experiments.slice(0,ei)}):''}
+  <div class="sheet"><h2>🎯 Goals</h2><p class="hint">Write these before you start.</p>
+    ${field(b+'.goals','test','What am I testing or fixing?','e.g. Use the starter only once it has doubled')}
+    ${field(b+'.goals','change','Which steps am I changing, and to what?','e.g. Step 2: wait 5 hrs until doubled')}
+    ${field(b+'.goals','keep','What am I keeping the same?','e.g. Everything else')}
+    ${field(b+'.goals','success','What result shows it worked?','e.g. Dough grows at least 50% in the bulk rise')}</div>
+  <div class="sheet"><h2>✍️ Steps</h2><p class="hint">Log each step as you do it. Exact numbers beat memory.</p>
+    <div id="steps">${e.steps.map((s,i)=>`
+      <div class="step ${s.marks.includes('changed')?'changed':''}">
+        <div class="num">${i+1}</div>
+        <div><div class="cols">
+          <textarea data-k="${b}.steps.${i}.did" rows="2" placeholder="What I did" aria-label="Step ${i+1}: what I did">${esc(s.did)}</textarea>
+          <textarea data-k="${b}.steps.${i}.happened" rows="2" placeholder="What happened" aria-label="Step ${i+1}: what happened">${esc(s.happened)}</textarea></div>
+          <div class="tools">${MARKS.map(([k,l])=>`<button class="mark" aria-pressed="${s.marks.includes(k)}" data-mark="${i}.${k}">${l}</button>`).join('')}
+          <span class="grow"></span>
+          <button class="x" data-up="${i}" aria-label="Move step ${i+1} up" ${i===0?'disabled':''}>↑</button>
+          <button class="x" data-rm="${i}" aria-label="Remove step ${i+1}">×</button></div></div></div>`).join('')}</div>
+    <button class="btn ghost small" data-addstep>+ Add step</button></div>
+  <div class="sheet"><h2>📝 Output notes</h2><p class="hint">Write these right after you finish, while it's fresh.</p>
+    <label class="f"><span>Result</span><select data-k="${b}.out.status" style="width:auto">${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${e.out.status===k?'selected':''}>${l}</option>`).join('')}</select></label>
+    ${field(b+'.out','result','What was the outcome?','e.g. Rose, but spread out and stayed pale')}
+    ${field(b+'.out','met','Goals met?','e.g. Rise: yes. Shape: no')}
+    ${field(b+'.out','worked','What worked (keep)','e.g. Active starter fixed the rise')}
+    ${field(b+'.out','problem','Main problem, and at which step?','e.g. Step 3: dough too wet to hold shape')}
+    ${field(b+'.out','why','Why I think it happened','e.g. 350g water is too much for this flour')}
+    ${field(b+'.out','next','What to change next','e.g. Cut water to 325g; preheat 45 min')}
+    <p class="hint">Then add anything proven to the <button class="btn ghost small" data-sum>Summary</button></p></div>
+  <div class="sheet"><h2>Later updates</h2><p class="hint">Learned something new about this experiment? Add a dated note. Old notes stay as they were.</p>
+    ${e.updates.map(u=>`<div class="upd"><small>${esc(u.date)}</small>${esc(u.text)}</div>`).join('')||''}
+    <div class="newp"><input id="updtext" placeholder="e.g. This was actually caused by a cold kitchen" aria-label="New update">
+    <button class="btn small" data-addupd>Add note</button></div></div>
+  <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+    <button class="btn ghost" data-proj2>Back to experiments</button>
+    <button class="btn ghost small" data-dele>Delete experiment</button></div>`;
+  bindInputs(p,$app);
+  const rerender=()=>{const y=window.scrollY;renderExperiment(p,e);window.scrollTo(0,y)};
+  $app.querySelector('[data-home]').onclick=()=>go({name:'home'});
+  [$app.querySelector('[data-proj]'),$app.querySelector('[data-proj2]')].forEach(x=>x.onclick=()=>go({name:'project',pid:p.id,tab:'experiments'}));
+  $app.querySelector('[data-sum]').onclick=()=>go({name:'project',pid:p.id,tab:'summary'});
+  $app.querySelectorAll('[data-mark]').forEach(btn=>btn.onclick=()=>{const [i,k]=btn.dataset.mark.split('.');const m=e.steps[+i].marks;
+    const at=m.indexOf(k); at>=0?m.splice(at,1):m.push(k); save(p.id); rerender()});
+  $app.querySelectorAll('[data-rm]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.rm;const s=e.steps[i];
+    if((s.did||s.happened)&&!confirm(`Remove step ${i+1}?`))return; e.steps.splice(i,1);save(p.id);rerender()});
+  $app.querySelectorAll('[data-up]').forEach(btn=>btn.onclick=()=>{const i=+btn.dataset.up;if(!i)return;[e.steps[i-1],e.steps[i]]=[e.steps[i],e.steps[i-1]];save(p.id);rerender()});
+  $app.querySelector('[data-addstep]').onclick=()=>{e.steps.push(blankStep());save(p.id);rerender();
+    const t=$app.querySelectorAll('#steps textarea');t[t.length-2]?.focus()};
+  const addUpd=()=>{const el=document.getElementById('updtext');const t=el.value.trim();if(!t)return el.focus();e.updates.push({date:today(),text:t});save(p.id);rerender()};
+  $app.querySelector('[data-addupd]').onclick=addUpd;
+  document.getElementById('updtext').onkeydown=ev=>{if(ev.key==='Enter')addUpd()};
+  $app.querySelector('[data-dele]').onclick=()=>{if(confirm(`Delete experiment ${e.n}? Failed experiments are often the most useful notes.`)){
+    p.experiments.splice(ei,1);p.experiments.forEach((x,i)=>x.n=i+1);save(p.id);go({name:'project',pid:p.id,tab:'experiments'})}};
+}
+initStore();
+</script>
+</body>
+</html>
