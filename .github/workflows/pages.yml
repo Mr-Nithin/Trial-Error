@@ -28,11 +28,13 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: web/package-lock.json
+      - id: pages
+        uses: actions/configure-pages@v5
       - run: npm ci
       - run: npm run build
         env:
           STATIC_EXPORT: "1"
-          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_BASE_PATH: ${{ steps.pages.outputs.base_path }}
           NEXT_TELEMETRY_DISABLED: "1"
       - uses: actions/upload-pages-artifact@v3
         with:
