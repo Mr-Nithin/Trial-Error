@@ -173,7 +173,7 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
                   label="Share best version"
                   onClick={() => {
                     const best = bestVersion(active);
-                    navigator.clipboard?.writeText(`${location.origin}/projects/${active.id}${best ? `/versions/${best.id}` : ""}`).catch(() => {});
+                    navigator.clipboard?.writeText(`${location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/projects/${active.id}${best ? `/versions/${best.id}` : ""}`).catch(() => {});
                     close();
                     toast.show("Link to best version copied");
                   }}
