@@ -3,7 +3,9 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { BackLink, OriginChip } from "@/components/ui";
+import { backend, isMock } from "@/lib/backend";
 import type { Project, Version } from "@/lib/data";
+import { refreshProject } from "@/lib/hooks";
 
 export function BranchPicker({ project, version }: { project: Project; version: Version }) {
   const router = useRouter();
@@ -15,6 +17,8 @@ export function BranchPicker({ project, version }: { project: Project; version: 
     recorded[recorded.length - 1];
   const [selected, setSelected] = useState(defaultStep?.id);
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   const nextNumber = Math.max(...project.versions.map((v) => v.number)) + 1;
   const pick = version.steps.find((s) => s.id === selected);
@@ -36,7 +40,7 @@ export function BranchPicker({ project, version }: { project: Project; version: 
 
       <div className="content" style={{ gap: 10 }}>
         <p className="small muted" style={{ margin: "0 0 4px", lineHeight: 1.5 }}>
-          Pick the step to branch from. The new version inherits every step up to and including it — you change what comes after.
+          Pick the step where you want to try something different. Steps before it are kept; it and everything after are re-recorded in the new version.
         </p>
 
         {version.steps.map((s) => {
@@ -79,7 +83,7 @@ export function BranchPicker({ project, version }: { project: Project; version: 
 
         {pick && (
           <div className="banner">
-            V{nextNumber} will copy steps 1–{pick.label} from V{version.number}. You’ll modify from step {pick.label} onward.
+            {Number(pick.label) > 1 ? `V${nextNumber} keeps steps 1–${Number(pick.label) - 1} from V${version.number}. ` : ""}You’ll re-record from step {pick.label} onward.
           </div>
         )}
       </div>
@@ -87,10 +91,32 @@ export function BranchPicker({ project, version }: { project: Project; version: 
       <div className="footer">
         <label className="field">
           <span>Name this version</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Greek yogurt topping" />
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Greek yogurt topping" maxLength={80} />
         </label>
-        <button type="button" className="btn primary block" disabled={!pick} onClick={() => router.push(`/projects/${project.id}`)}>
-          Start V{nextNumber} from step {pick?.label}
+        {error && (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        )}
+        <button
+          type="button"
+          className="btn primary block"
+          disabled={!pick || busy}
+          onClick={async () => {
+            if (!pick) return;
+            setBusy(true);
+            setError("");
+            try {
+              const v = await backend.branchVersion(version.id, { fromStepId: pick.id, name: name.trim() || `Try from step ${pick.label}` });
+              await refreshProject(project.id);
+              router.push(isMock ? `/projects/${project.id}` : `/projects/${project.id}/versions/${v.id}`);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Couldn’t create the version");
+              setBusy(false);
+            }
+          }}
+        >
+          {busy ? "Creating…" : `Start V${nextNumber} from step ${pick?.label ?? ""}`}
         </button>
       </div>
     </main>

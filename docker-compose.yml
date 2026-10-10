@@ -1,6 +1,61 @@
 services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: arc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-arc}
+      POSTGRES_DB: arc
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arc -d arc"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-arc-media}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-change-me-minio-secret}
+    volumes:
+      - media-data:/data
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    environment:
+      DATABASE_URL: postgres://arc:${POSTGRES_PASSWORD:-arc}@db:5432/arc
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: arc-media
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-arc-media}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-change-me-minio-secret}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      TRUST_PROXY: "true"
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    restart: unless-stopped
+
   web:
-    build: ./web
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        API_URL: http://api:4000
     ports:
       - "3000:3000"
+    depends_on:
+      - api
     restart: unless-stopped
+
+volumes:
+  db-data:
+  media-data:

@@ -2,19 +2,34 @@
 
 import { useState } from "react";
 import { Icon } from "@/components/Icon";
-import { BackLink } from "@/components/ui";
+import { Sheet } from "@/components/Sheet";
+import { BackLink, ErrorState, Loading } from "@/components/ui";
 import { useToast } from "@/components/useToast";
-import { projects } from "@/lib/data";
+import { backend } from "@/lib/backend";
+import type { ProjectSummary } from "@/lib/data";
+import { refreshProject, useProjects } from "@/lib/hooks";
+import { useAction } from "@/lib/useAction";
 
 export default function ArchivedPage() {
-  const [items, setItems] = useState(projects.filter((p) => p.archived));
+  const { data: items, error, mutate } = useProjects(true);
+  const [confirm, setConfirm] = useState<ProjectSummary | null>(null);
   const toast = useToast();
+  const { run, busy } = useAction(toast.show);
 
-  const drop = (id: string, message: string) => {
-    const snapshot = items;
-    setItems(items.filter((p) => p.id !== id));
-    toast.show(message, () => setItems(snapshot));
-  };
+  if (error) return <ErrorState message={error.message} onRetry={() => mutate()} />;
+  if (!items) return <Loading />;
+
+  const restore = (p: ProjectSummary) =>
+    run(async () => {
+      await backend.updateProject(p.id, { archived: false });
+      await refreshProject(p.id);
+      toast.show(`“${p.name}” restored to projects`, () =>
+        void run(async () => {
+          await backend.updateProject(p.id, { archived: true });
+          await refreshProject(p.id);
+        }),
+      );
+    });
 
   return (
     <main className="screen">
@@ -48,22 +63,45 @@ export default function ArchivedPage() {
               </div>
             </div>
             <div className="row" style={{ gap: 8 }}>
-              <button type="button" className="btn secondary sm grow" onClick={() => drop(p.id, `“${p.name}” restored to projects`)}>
+              <button type="button" className="btn secondary sm grow" disabled={busy} onClick={() => restore(p)}>
                 <Icon name="restore" size={16} /> Restore
               </button>
-              <button
-                type="button"
-                className="btn danger sm"
-                style={{ width: 40, padding: 0 }}
-                aria-label={`Delete ${p.name}`}
-                onClick={() => drop(p.id, `“${p.name}” deleted`)}
-              >
+              <button type="button" className="btn danger sm" style={{ width: 40, padding: 0 }} aria-label={`Delete ${p.name}`} onClick={() => setConfirm(p)}>
                 <Icon name="trash" size={16} />
               </button>
             </div>
           </div>
         ))}
       </div>
+
+      <Sheet open={!!confirm} onClose={() => setConfirm(null)} label="Delete project">
+        {confirm && (
+          <div className="sheet-pad">
+            <h2 className="title sm">Delete “{confirm.name}”?</h2>
+            <p className="muted" style={{ margin: 0 }}>
+              Removes {confirm.versionCount} versions and {confirm.runCount} runs permanently.
+            </p>
+            <button
+              type="button"
+              className="btn danger block"
+              disabled={busy}
+              onClick={() =>
+                run(async () => {
+                  await backend.deleteProject(confirm.id);
+                  setConfirm(null);
+                  await refreshProject(confirm.id);
+                  toast.show(`“${confirm.name}” deleted`);
+                })
+              }
+            >
+              <Icon name="trash" size={18} /> Delete forever
+            </button>
+            <button type="button" className="btn secondary block" onClick={() => setConfirm(null)}>
+              Cancel
+            </button>
+          </div>
+        )}
+      </Sheet>
       {toast.node}
     </main>
   );

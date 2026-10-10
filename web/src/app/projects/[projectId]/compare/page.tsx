@@ -1,15 +1,23 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
 import { Suspense } from "react";
-import { getProject } from "@/lib/data";
+import { GateScreen } from "@/components/ProjectGate";
+import { Loading } from "@/components/ui";
+import { useProjectPage } from "@/lib/hooks";
 import { CompareView } from "./CompareView";
 
-export default async function ComparePage({ params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = await params;
-  const project = getProject(projectId);
-  if (!project) notFound();
+function Screen() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { data, gate, mutate } = useProjectPage(projectId);
+  if (gate) return <GateScreen gate={gate} onRetry={() => mutate()} />;
+  return <CompareView project={data!} />;
+}
+
+export default function ComparePage() {
   return (
-    <Suspense>
-      <CompareView project={project} />
+    <Suspense fallback={<Loading />}>
+      <Screen />
     </Suspense>
   );
 }

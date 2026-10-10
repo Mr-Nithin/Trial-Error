@@ -7,56 +7,50 @@ import { GoalSheet } from "@/components/GoalSheet";
 import { Icon, MoreIcon } from "@/components/Icon";
 import { ProjectsEmpty } from "@/components/ProjectsEmpty";
 import { Sheet, SheetItem } from "@/components/Sheet";
-import { OutputTiles } from "@/components/ui";
+import { ErrorState, Loading, OutputTiles } from "@/components/ui";
 import { useToast } from "@/components/useToast";
-import { bestVersion, goalsMet, totalRuns, type Project } from "@/lib/data";
+import { backend } from "@/lib/backend";
+import type { Goal, ProjectSummary } from "@/lib/data";
+import { goalsMet } from "@/lib/data";
+import { refreshProject, useMe, useProjects } from "@/lib/hooks";
+import { useAction } from "@/lib/useAction";
 
 type SheetMode = "actions" | "rename" | "goals" | "delete";
 
-export function ProjectsList({ initial, archivedCount }: { initial: Project[]; archivedCount: number }) {
-  const [items, setItems] = useState(initial);
+const toGoalInput = ({ metric, label, icon, op, target, unit }: Goal) => ({ metric, label, icon, op, target, unit });
+
+export function ProjectsList() {
+  const { data: items, error, mutate } = useProjects(false);
+  const { data: archivedItems } = useProjects(true);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string>("All");
   const [sort, setSort] = useState<"Recent" | "A–Z">("Recent");
-  const [active, setActive] = useState<Project | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [mode, setMode] = useState<SheetMode>("actions");
   const [renameTo, setRenameTo] = useState("");
   const [goalSheet, setGoalSheet] = useState(false);
-  const [archived, setArchived] = useState(archivedCount);
   const toast = useToast();
+  const { run, busy } = useAction(toast.show);
 
-  const categories = useMemo(() => Array.from(new Set(items.map((p) => p.category))), [items]);
-
+  const categories = useMemo(() => Array.from(new Set((items ?? []).map((p) => p.category))), [items]);
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = items.filter(
-      (p) =>
-        (category === "All" || p.category === category) &&
-        (!q ||
-          p.name.toLowerCase().includes(q) ||
-          p.versions.some((v) => v.name.toLowerCase().includes(q) || v.steps.some((s) => s.title.toLowerCase().includes(q)))),
-    );
+    const list = (items ?? []).filter((p) => (category === "All" || p.category === category) && (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
     return sort === "A–Z" ? [...list].sort((a, b) => a.name.localeCompare(b.name)) : list;
   }, [items, query, category, sort]);
 
-  const open = (p: Project) => {
-    setActive(p);
-    setMode("actions");
-  };
-  const close = () => setActive(null);
-  const update = (id: string, fn: (p: Project) => Project) => {
-    setItems((list) => list.map((p) => (p.id === id ? fn(p) : p)));
-    setActive((a) => (a && a.id === id ? fn(a) : a));
-  };
-  const remove = (p: Project, message: string, onUndo?: () => void) => {
-    const snapshot = items;
-    setItems((list) => list.filter((x) => x.id !== p.id));
-    close();
-    toast.show(message, () => {
-      setItems(snapshot);
-      onUndo?.();
+  if (error) return <ErrorState message={error.message} onRetry={() => mutate()} />;
+  if (!items) return <Loading />;
+
+  const active = items.find((p) => p.id === activeId) ?? null;
+  const close = () => setActiveId(null);
+  const act = (fn: () => Promise<unknown>, message: string, undo?: () => Promise<unknown>) =>
+    run(async () => {
+      await fn();
+      close();
+      await refreshProject(active?.id);
+      toast.show(message, undo ? () => void run(async () => (await undo(), await refreshProject(active?.id))) : undefined);
     });
-  };
 
   if (items.length === 0) {
     return (
@@ -74,7 +68,7 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
         <TopBar inline />
         <label className="search">
           <Icon name="search" size={18} />
-          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search projects, versions, steps" aria-label="Search projects" />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search projects" aria-label="Search projects" />
         </label>
         <div className="row tight">
           <div className="scroll-x grow" style={{ gap: 6 }}>
@@ -106,7 +100,15 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
         )}
 
         {visible.map((p, i) => (
-          <ProjectCard key={p.id} project={p} highlight={i === 0 && sort === "Recent" && !query} onMore={() => open(p)} />
+          <ProjectCard
+            key={p.id}
+            project={p}
+            highlight={i === 0 && sort === "Recent" && !query}
+            onMore={() => {
+              setActiveId(p.id);
+              setMode("actions");
+            }}
+          />
         ))}
 
         <Link href="/projects/new" className="btn dashed block">
@@ -120,7 +122,7 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
           <span className="grow strong" style={{ fontSize: 14 }}>
             Archived
           </span>
-          <span className="small muted">{archived}</span>
+          <span className="small muted">{archivedItems?.length ?? "–"}</span>
           <span style={{ color: "var(--rule-strong)" }}>
             <Icon name="chevron" size={16} />
           </span>
@@ -139,7 +141,7 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
                   {active.name}
                 </div>
                 <div className="small muted">
-                  {active.category} · {active.versions.length} versions · {totalRuns(active)} runs
+                  {active.category} · {active.versionCount} versions · {active.runCount} runs
                 </div>
               </div>
             </div>
@@ -155,51 +157,32 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
                   }}
                 />
                 <SheetItem icon="target" label="Edit goals" trailing={<span className="small muted">{active.goals.length}</span>} onClick={() => setMode("goals")} />
-                <SheetItem
-                  icon="copy"
-                  label="Duplicate project"
-                  onClick={() => {
-                    const copy = { ...active, id: `${active.id}-copy-${Date.now()}`, name: `${active.name} (copy)` };
-                    setItems((list) => {
-                      const at = list.findIndex((x) => x.id === active.id);
-                      return [...list.slice(0, at + 1), copy, ...list.slice(at + 1)];
-                    });
-                    close();
-                    toast.show(`Duplicated “${active.name}”`);
-                  }}
-                />
+                <SheetItem icon="copy" label="Duplicate project" onClick={() => act(() => backend.duplicateProject(active.id), `Duplicated “${active.name}”`)} />
                 <SheetItem
                   icon="share"
-                  label="Share best version"
+                  label="Share project link"
                   onClick={() => {
-                    const best = bestVersion(active);
-                    navigator.clipboard?.writeText(`${location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/projects/${active.id}${best ? `/versions/${best.id}` : ""}`).catch(() => {});
+                    navigator.clipboard?.writeText(`${location.origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/projects/${active.id}`).catch(() => {});
                     close();
-                    toast.show("Link to best version copied");
+                    toast.show("Project link copied");
                   }}
                 />
-                <SheetItem
-                  icon="pin"
-                  label="Pin to top"
-                  onClick={() => {
-                    setItems((list) => [active, ...list.filter((x) => x.id !== active.id)]);
-                    setSort("Recent");
-                    close();
-                    toast.show(`Pinned “${active.name}”`);
-                  }}
-                />
+                <SheetItem icon="pin" label="Pin to top" onClick={() => act(() => backend.updateProject(active.id, { pinned: true }), `Pinned “${active.name}”`)} />
                 <div className="divider" />
                 <SheetItem
                   icon="archive"
                   label="Archive project"
-                  onClick={() => {
-                    setArchived((n) => n + 1);
-                    remove(active, `“${active.name}” archived`, () => setArchived((n) => n - 1));
-                  }}
+                  onClick={() =>
+                    act(
+                      () => backend.updateProject(active.id, { archived: true }),
+                      `“${active.name}” archived`,
+                      () => backend.updateProject(active.id, { archived: false }),
+                    )
+                  }
                 />
                 <SheetItem icon="trash" label="Delete project" tone="danger" onClick={() => setMode("delete")} />
                 <div className="sheet-note">
-                  Deletes {active.versions.length} versions and {totalRuns(active)} runs permanently. Archive instead to keep history.
+                  Deletes {active.versionCount} versions and {active.runCount} runs permanently. Archive instead to keep history.
                 </div>
               </div>
             )}
@@ -209,17 +192,14 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
                 className="sheet-pad"
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (!renameTo.trim()) return;
-                  update(active.id, (p) => ({ ...p, name: renameTo.trim() }));
-                  close();
-                  toast.show("Project renamed");
+                  if (renameTo.trim()) act(() => backend.updateProject(active.id, { name: renameTo.trim() }), "Project renamed");
                 }}
               >
                 <label className="field">
                   <span>Project name</span>
-                  <input className="input" value={renameTo} onChange={(e) => setRenameTo(e.target.value)} autoFocus />
+                  <input className="input" value={renameTo} onChange={(e) => setRenameTo(e.target.value)} maxLength={80} autoFocus />
                 </label>
-                <button type="submit" className="btn primary block" disabled={!renameTo.trim()}>
+                <button type="submit" className="btn primary block" disabled={!renameTo.trim() || busy}>
                   Save
                 </button>
                 <button type="button" className="btn secondary block" onClick={() => setMode("actions")}>
@@ -230,6 +210,7 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
 
             {mode === "goals" && (
               <div className="sheet-pad">
+                {active.goals.length === 0 && <div className="small muted">No goals yet. Runs are scored against goals.</div>}
                 {active.goals.map((g) => (
                   <div key={g.metric} className="list-row">
                     <span style={{ fontSize: 18 }}>{g.icon}</span>
@@ -238,7 +219,13 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
                       type="button"
                       className="icon-btn xs"
                       aria-label={`Remove ${g.label}`}
-                      onClick={() => update(active.id, (p) => ({ ...p, goals: p.goals.filter((x) => x.metric !== g.metric) }))}
+                      disabled={busy}
+                      onClick={() =>
+                        run(async () => {
+                          await backend.replaceGoals(active.id, { goals: active.goals.filter((x) => x.metric !== g.metric).map(toGoalInput) });
+                          await refreshProject(active.id);
+                        })
+                      }
                     >
                       <Icon name="close" size={14} />
                     </button>
@@ -257,9 +244,9 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
               <div className="sheet-pad">
                 <h2 className="title sm">Delete “{active.name}”?</h2>
                 <p className="muted" style={{ margin: 0 }}>
-                  This removes {active.versions.length} versions, every step and {totalRuns(active)} runs. It can’t be undone.
+                  This removes {active.versionCount} versions, every step and {active.runCount} runs. It can’t be undone.
                 </p>
-                <button type="button" className="btn danger block" onClick={() => remove(active, `“${active.name}” deleted`)}>
+                <button type="button" className="btn danger block" disabled={busy} onClick={() => act(() => backend.deleteProject(active.id), `“${active.name}” deleted`)}>
                   <Icon name="trash" size={18} /> Delete forever
                 </button>
                 <button type="button" className="btn secondary block" onClick={() => setMode("actions")}>
@@ -276,7 +263,12 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
           open={goalSheet}
           onClose={() => setGoalSheet(false)}
           existing={active.goals.map((g) => g.metric)}
-          onAdd={(g) => update(active.id, (p) => ({ ...p, goals: [...p.goals, g] }))}
+          onAdd={(g) =>
+            run(async () => {
+              await backend.replaceGoals(active.id, { goals: [...active.goals, g].map(toGoalInput) });
+              await refreshProject(active.id);
+            })
+          }
         />
       )}
       {toast.node}
@@ -287,22 +279,22 @@ export function ProjectsList({ initial, archivedCount }: { initial: Project[]; a
 const categoryEmoji: Record<string, string> = { Food: "🍳", Fitness: "🏃", Plant: "🌱", Build: "🔨", Create: "🎨" };
 
 function TopBar({ inline }: { inline?: boolean }) {
+  const { data: me } = useMe();
   const bar = (
     <div className="row between">
       <ArcLogo />
       <Link href="/profile" className="avatar" aria-label="Account">
-        N
+        {(me?.name ?? "?").slice(0, 1).toUpperCase()}
       </Link>
     </div>
   );
   return inline ? bar : <header className="header">{bar}</header>;
 }
 
-function ProjectCard({ project, highlight, onMore }: { project: Project; highlight: boolean; onMore: () => void }) {
-  const best = bestVersion(project) ?? project.versions[project.versions.length - 1];
-  const met = best ? goalsMet(project, best.outputs) : 0;
+function ProjectCard({ project, highlight, onMore }: { project: ProjectSummary; highlight: boolean; onMore: () => void }) {
+  const outputs = project.bestOutputs;
+  const met = outputs ? goalsMet(project, outputs) : 0;
   const total = project.goals.length;
-  const inProgress = !bestVersion(project);
 
   return (
     <div className={`card lg${highlight ? " best" : ""}`}>
@@ -314,14 +306,16 @@ function ProjectCard({ project, highlight, onMore }: { project: Project; highlig
           <div className="grow">
             <div className="name">{project.name}</div>
             <div className="xs muted">
-              {project.category} · {project.versions.length} version{project.versions.length === 1 ? "" : "s"} · {totalRuns(project)} runs
+              {project.category} · {project.versionCount} version{project.versionCount === 1 ? "" : "s"} · {project.runCount} runs
             </div>
           </div>
         </Link>
-        {inProgress ? (
-          <span className="chip">In progress</span>
+        {!project.hasBest || !outputs ? (
+          <span className="chip">{project.versionCount ? "In progress" : "New"}</span>
         ) : met === total ? (
-          <span className="chip solid">★ {met}/{total}</span>
+          <span className="chip solid">
+            ★ {met}/{total}
+          </span>
         ) : (
           <span className="chip amber">
             {met}/{total}
@@ -331,7 +325,7 @@ function ProjectCard({ project, highlight, onMore }: { project: Project; highlig
           <MoreIcon size={16} />
         </button>
       </div>
-      {highlight && best && <OutputTiles goals={project.goals} outputs={best.outputs} />}
+      {highlight && outputs && total > 0 && <OutputTiles goals={project.goals} outputs={outputs} />}
       <div className="xs muted">Last run: {project.lastRun}</div>
     </div>
   );

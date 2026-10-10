@@ -1,11 +1,15 @@
-import { notFound } from "next/navigation";
-import { getProject, getVersion, totalRuns } from "@/lib/data";
+"use client";
+
+import { useParams } from "next/navigation";
+import { GateScreen } from "@/components/ProjectGate";
+import { useProjectPage } from "@/lib/hooks";
 import { RunSummary } from "./RunSummary";
 
-export default async function RunCompletePage({ params }: { params: Promise<{ projectId: string; versionId: string }> }) {
-  const { projectId, versionId } = await params;
-  const project = getProject(projectId);
-  const version = project && getVersion(project, versionId);
-  if (!project || !version) notFound();
-  return <RunSummary project={project} version={version} runNumber={totalRuns(project) + 1} />;
+export default function RunCompletePage() {
+  const { projectId, versionId } = useParams<{ projectId: string; versionId: string }>();
+  const { data, gate, mutate } = useProjectPage(projectId);
+  if (gate) return <GateScreen gate={gate} onRetry={() => mutate()} />;
+  const version = data!.versions.find((v) => v.id === versionId);
+  if (!version) return <GateScreen gate={{ message: "This version doesn’t exist, or it was deleted." }} />;
+  return <RunSummary project={data!} version={version} />;
 }

@@ -1,10 +1,13 @@
-import { notFound } from "next/navigation";
-import { getProject } from "@/lib/data";
+"use client";
+
+import { useParams } from "next/navigation";
+import { GateScreen } from "@/components/ProjectGate";
+import { useProjectPage } from "@/lib/hooks";
 import { VersionsTimeline } from "./VersionsTimeline";
 
-export default async function ProjectPage({ params }: { params: Promise<{ projectId: string }> }) {
-  const { projectId } = await params;
-  const project = getProject(projectId);
-  if (!project || project.archived) notFound();
-  return <VersionsTimeline project={project} />;
+export default function ProjectPage() {
+  const { projectId } = useParams<{ projectId: string }>();
+  const { data, gate, mutate } = useProjectPage(projectId);
+  if (gate) return <GateScreen gate={gate} onRetry={() => mutate()} />;
+  return <VersionsTimeline project={data!} />;
 }

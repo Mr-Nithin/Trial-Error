@@ -52,3 +52,60 @@ export function OriginChip({ origin, fromVersion }: { origin: string; fromVersio
   if (origin === "new") return <span className="chip green">new</span>;
   return null;
 }
+
+export function Loading({ label = "Loading…" }: { label?: string }) {
+  return (
+    <main className="screen" aria-busy="true">
+      <div className="content" style={{ alignItems: "center", justifyContent: "center" }}>
+        <span className="spinner" aria-hidden="true" />
+        <span className="small muted">{label}</span>
+      </div>
+    </main>
+  );
+}
+
+export function ErrorState({
+  title = "Something went wrong",
+  message,
+  backHref = "/projects",
+  onRetry,
+}: {
+  title?: string;
+  message: string;
+  backHref?: string;
+  onRetry?: () => void;
+}) {
+  return (
+    <main className="screen">
+      <div className="content" style={{ alignItems: "center", justifyContent: "center", textAlign: "center", gap: 14 }}>
+        <h1 className="title sm">{title}</h1>
+        <p className="muted" style={{ margin: 0 }}>
+          {message}
+        </p>
+        <div className="row">
+          {onRetry && (
+            <button type="button" className="btn secondary sm" onClick={onRetry}>
+              Try again
+            </button>
+          )}
+          <Link href={backHref} className="btn primary sm">
+            Back to projects
+          </Link>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export function Thumb({ url, size = 56, label = "photo" }: { url?: string; size?: number; label?: string }) {
+  const style = { width: size, height: size };
+  if (url && !url.startsWith("#")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt="" className="thumb" style={{ ...style, objectFit: "cover" }} />;
+  }
+  return (
+    <div className="thumb" style={{ ...style, background: url ?? "var(--chip)" }}>
+      {size >= 48 ? label : null}
+    </div>
+  );
+}

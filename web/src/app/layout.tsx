@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Sans, Space_Grotesk } from "next/font/google";
+import { Providers } from "@/components/Providers";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -31,7 +32,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${plex.variable}`}>
       <body>
-        <div className="app">{children}</div>
+        <div className="app">
+          <Providers>{children}</Providers>
+        </div>
       </body>
     </html>
   );

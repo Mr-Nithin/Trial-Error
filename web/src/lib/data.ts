@@ -1,6 +1,7 @@
 export type MetricKey = string;
 
 export type Goal = {
+  id?: string;
   metric: MetricKey;
   label: string;
   short: string;
@@ -20,6 +21,8 @@ export type Step = {
   origin: StepOrigin;
   fromVersion?: number;
   photo?: string;
+  photoUrl?: string;
+  outputs?: Outputs;
   subSteps?: Step[];
 };
 
@@ -59,6 +62,22 @@ export type Project = {
   versions: Version[];
   runs: Run[];
   lastRun: string;
+  archived?: string;
+  bestVersionId?: string | null;
+};
+
+export type ProjectSummary = {
+  id: string;
+  name: string;
+  emoji: string;
+  tint: string;
+  category: Category;
+  goals: Goal[];
+  versionCount: number;
+  runCount: number;
+  lastRun: string;
+  bestOutputs: Outputs | null;
+  hasBest: boolean;
   archived?: string;
 };
 
@@ -275,38 +294,13 @@ export const projects: Project[] = [
   },
 ];
 
-export function getProject(id: string): Project | undefined {
-  return projects.find((p) => p.id === id);
-}
-
-export function getVersion(project: Project, versionId: string): Version | undefined {
-  return project.versions.find((v) => v.id === versionId);
-}
-
-export function findStep(version: Version, stepId: string): Step | undefined {
-  for (const s of version.steps) {
-    if (s.id === stepId) return s;
-    const sub = s.subSteps?.find((x) => x.id === stepId);
-    if (sub) return sub;
-  }
-  return undefined;
-}
-
 export function goalMet(goal: Goal, value: number | undefined): boolean | undefined {
   if (value === undefined) return undefined;
   return goal.op === ">=" ? value >= goal.target : value <= goal.target;
 }
 
-export function goalsMet(project: Project, outputs: Outputs): number {
+export function goalsMet(project: { goals: Goal[] }, outputs: Outputs): number {
   return project.goals.filter((g) => goalMet(g, outputs[g.metric])).length;
-}
-
-export function bestVersion(project: Project): Version | undefined {
-  return project.versions.find((v) => v.status === "best");
-}
-
-export function totalRuns(project: Project): number {
-  return project.versions.reduce((n, v) => n + v.runs, 0);
 }
 
 export function formatValue(goal: Goal, value: number | undefined): string {
@@ -319,6 +313,3 @@ export function formatValue(goal: Goal, value: number | undefined): string {
 }
 
 
-export function projectParams() {
-  return projects.filter((p) => !p.archived).map((p) => ({ projectId: p.id }));
-}

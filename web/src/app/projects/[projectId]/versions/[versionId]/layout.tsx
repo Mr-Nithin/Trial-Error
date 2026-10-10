@@ -1,7 +1,8 @@
-import { getProject } from "@/lib/data";
+import { mockStaticParams } from "@/lib/backend/mock";
 
 export function generateStaticParams({ params }: { params: { projectId: string } }) {
-  return (getProject(params.projectId)?.versions ?? []).map((v) => ({ versionId: v.id }));
+  if (process.env.STATIC_EXPORT !== "1") return [];
+  return (mockStaticParams().find((p) => p.projectId === params.projectId)?.versions ?? []).map(({ versionId }) => ({ versionId }));
 }
 
 export default function VersionLayout({ children }: { children: React.ReactNode }) {

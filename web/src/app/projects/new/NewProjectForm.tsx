@@ -4,7 +4,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { GoalSheet, goalTemplates } from "@/components/GoalSheet";
 import { Icon } from "@/components/Icon";
-import type { Goal } from "@/lib/data";
+import { backend, isMock } from "@/lib/backend";
+import type { Category, Goal } from "@/lib/data";
+import { refreshProject } from "@/lib/hooks";
 
 const categories = [
   ["🍳", "Food"],
@@ -32,10 +34,26 @@ export function NewProjectForm() {
   const [category, setCategory] = useState(template.category);
   const [goals, setGoals] = useState<Goal[]>(goalTemplates.filter((g) => template.goals.includes(g.metric)));
   const [sheet, setSheet] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const create = () => {
-    if (!name.trim()) return;
-    router.push("/projects");
+  const create = async () => {
+    if (!name.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const project = await backend.createProject({
+        name: name.trim(),
+        emoji,
+        category: category as Category,
+        goals: goals.map(({ metric, label, icon, op, target, unit }) => ({ metric, label, icon, op, target, unit })),
+      });
+      await refreshProject();
+      router.push(isMock ? "/projects" : `/projects/${project.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn’t create the project");
+      setBusy(false);
+    }
   };
 
   return (
@@ -46,7 +64,7 @@ export function NewProjectForm() {
             <Icon name="close" />
           </button>
           <span className="name">New project</span>
-          <button type="button" className="link-btn" disabled={!name.trim()} style={{ opacity: name.trim() ? 1 : 0.4, padding: "0 6px" }} onClick={create}>
+          <button type="button" className="link-btn" disabled={!name.trim() || busy} style={{ opacity: name.trim() ? 1 : 0.4, padding: "0 6px" }} onClick={create}>
             Create
           </button>
         </div>
@@ -67,7 +85,7 @@ export function NewProjectForm() {
 
         <label className="field">
           <span>Project name</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. My Breakfast" autoFocus />
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. My Breakfast" maxLength={80} autoFocus />
         </label>
 
         <div className="field">
@@ -104,8 +122,9 @@ export function NewProjectForm() {
       </div>
 
       <div className="footer" style={{ borderTop: "none" }}>
-        <button type="button" className="btn primary block" disabled={!name.trim()} onClick={create}>
-          Create project
+        {error && <div className="form-error" role="alert">{error}</div>}
+        <button type="button" className="btn primary block" disabled={!name.trim() || busy} onClick={create}>
+          {busy ? "Creating…" : "Create project"}
         </button>
       </div>
 

@@ -1,32 +1,52 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useParams, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { findStep, getProject, getVersion } from "@/lib/data";
+import { GateScreen } from "@/components/ProjectGate";
+import { Loading } from "@/components/ui";
+import { useProjectPage } from "@/lib/hooks";
 import { StepRecorder } from "./StepRecorder";
 
-export function generateStaticParams({ params }: { params: { projectId: string; versionId: string } }) {
-  const project = getProject(params.projectId);
-  const version = project && getVersion(project, params.versionId);
-  if (!version) return [];
-  const ids = version.steps.flatMap((s) => [s.id, ...(s.subSteps?.map((x) => x.id) ?? [])]);
-  return [...ids, "new"].map((stepId) => ({ stepId }));
-}
+function StepScreen() {
+  const { projectId, versionId, stepId } = useParams<{ projectId: string; versionId: string; stepId: string }>();
+  const parentId = useSearchParams().get("parent");
+  const { data, gate, mutate } = useProjectPage(projectId);
+  if (gate) return <GateScreen gate={gate} onRetry={() => mutate()} />;
+  const version = data!.versions.find((v) => v.id === versionId);
+  if (!version) return <GateScreen gate={{ message: "This version doesn’t exist, or it was deleted." }} />;
 
-export default async function StepPage({ params }: { params: Promise<{ projectId: string; versionId: string; stepId: string }> }) {
-  const { projectId, versionId, stepId } = await params;
-  const project = getProject(projectId);
-  const version = project && getVersion(project, versionId);
-  if (!project || !version) notFound();
-  const step = stepId === "new" ? undefined : findStep(version, stepId);
-  if (stepId !== "new" && !step) notFound();
+  const isNew = stepId === "new";
+  let step;
+  let parentStep = parentId ? version.steps.find((s) => s.id === parentId) : undefined;
+  if (!isNew) {
+    for (const s of version.steps) {
+      if (s.id === stepId) step = s;
+      const sub = s.subSteps?.find((x) => x.id === stepId);
+      if (sub) {
+        step = sub;
+        parentStep = s;
+      }
+    }
+    if (!step) return <GateScreen gate={{ message: "This step doesn’t exist, or it was deleted." }} />;
+  }
 
   return (
-    <Suspense>
-      <StepRecorder
-        step={step}
-        goals={project.goals}
-        backHref={`/projects/${project.id}/versions/${version.id}`}
-        nextLabel={String(version.steps.length + 1)}
-      />
+    <StepRecorder
+      key={stepId}
+      projectId={data!.id}
+      versionId={version.id}
+      step={step}
+      parentStep={parentStep}
+      goals={data!.goals}
+      nextLabel={String(version.steps.length + 1)}
+    />
+  );
+}
+
+export default function StepPage() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <StepScreen />
     </Suspense>
   );
 }

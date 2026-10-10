@@ -10,10 +10,9 @@ type Row = { kind: "same"; steps: Step[] } | { kind: "changed" | "added" | "remo
 
 function diff(a: Version, b: Version): Row[] {
   const rows: Row[] = [];
-  const ids = [...new Set([...a.steps.map((s) => s.id), ...b.steps.map((s) => s.id)])];
-  for (const id of ids) {
-    const sa = a.steps.find((s) => s.id === id);
-    const sb = b.steps.find((s) => s.id === id);
+  for (let i = 0; i < Math.max(a.steps.length, b.steps.length); i++) {
+    const sa = a.steps[i];
+    const sb = b.steps[i];
     const notRecorded = sa?.origin === "pending" || sb?.origin === "pending";
     if (sa && sb && (notRecorded || (sa.title === sb.title && sa.detail === sb.detail && (sa.subSteps?.length ?? 0) === (sb.subSteps?.length ?? 0)))) {
       const prev = rows[rows.length - 1];
@@ -29,8 +28,9 @@ function diff(a: Version, b: Version): Row[] {
 export function CompareView({ project }: { project: Project }) {
   const search = useSearchParams();
   const vs = project.versions;
-  const initialB = vs.find((v) => v.id === search.get("b")) ?? vs.find((v) => v.status === "best") ?? vs[vs.length - 1];
-  const initialA = vs.find((v) => v.id === initialB?.parentId) ?? vs.find((v) => v.id !== initialB?.id) ?? initialB;
+  const initialB = vs.find((v) => v.id === search.get("b")) ?? vs[vs.length - 1];
+  const initialA =
+    vs.find((v) => v.id === initialB?.parentId) ?? vs.find((v) => v.status === "best" && v.id !== initialB?.id) ?? vs.find((v) => v.id !== initialB?.id) ?? initialB;
   const [aId, setA] = useState(initialA?.id);
   const [bId, setB] = useState(initialB?.id);
   const a = vs.find((v) => v.id === aId);
@@ -102,18 +102,30 @@ export function CompareView({ project }: { project: Project }) {
               </div>
               {r.kind === "changed" && (
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                  <div className="thumb" style={{ width: "100%", height: 90, background: r.a?.photo ?? "var(--chip)" }}>
-                    V{a.number} photo
-                  </div>
-                  <div className="thumb" style={{ width: "100%", height: 90, background: r.b?.photo ?? "var(--chip)" }}>
-                    V{b.number} photo
-                  </div>
+                  <ComparePhoto url={r.a?.photoUrl ?? r.a?.photo} label={`V${a.number} photo`} />
+                  <ComparePhoto url={r.b?.photoUrl ?? r.b?.photo} label={`V${b.number} photo`} />
                 </div>
               )}
               <div className="small">
-                {r.a && <span className="muted" style={{ textDecoration: r.kind === "changed" ? "line-through" : undefined }}>{r.a.detail}</span>}
-                {r.a && r.b && " → "}
-                {r.b && <span className="strong">{r.b.detail}</span>}
+                {r.kind === "changed" && r.a!.title !== r.b!.title && (
+                  <div style={{ marginBottom: 4 }}>
+                    <span className="muted" style={{ textDecoration: "line-through" }}>
+                      {r.a!.title}
+                    </span>{" "}
+                    → <span className="strong">{r.b!.title}</span>
+                  </div>
+                )}
+                {(r.a?.detail || r.b?.detail) && (
+                  <div>
+                    {r.a?.detail && (
+                      <span className="muted" style={{ textDecoration: r.kind === "changed" ? "line-through" : undefined }}>
+                        {r.a.detail}
+                      </span>
+                    )}
+                    {r.a?.detail && r.b?.detail && " → "}
+                    {r.b?.detail && <span className="strong">{r.b.detail}</span>}
+                  </div>
+                )}
                 {r.b?.subSteps?.map((s) => (
                   <div key={s.id} className="green strong" style={{ marginTop: 4 }}>
                     + {s.label} {s.title}, {s.detail.split(" · ")[0]}
@@ -148,7 +160,11 @@ export function CompareView({ project }: { project: Project }) {
       </div>
 
       <div className="footer">
-        {missed.length > 0 ? (
+        {b.runs === 0 ? (
+          <Link href={`/projects/${project.id}/versions/${b.id}/run`} className="btn primary block">
+            Run V{b.number} to see how it scores
+          </Link>
+        ) : missed.length > 0 ? (
           <Link href={`/projects/${project.id}/versions/${b.id}/branch${firstChange?.b ? `?from=${firstChange.b.id}` : ""}`} className="btn dark block">
             Try V{nextNumber} from step {firstChange?.b?.label ?? 1} — fix {missed[0].label.toLowerCase()}
           </Link>
@@ -159,5 +175,17 @@ export function CompareView({ project }: { project: Project }) {
         )}
       </div>
     </main>
+  );
+}
+
+function ComparePhoto({ url, label }: { url?: string; label: string }) {
+  if (url && !url.startsWith("#")) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={label} className="thumb" style={{ width: "100%", height: 90, objectFit: "cover" }} />;
+  }
+  return (
+    <div className="thumb" style={{ width: "100%", height: 90, background: url ?? "var(--chip)" }}>
+      {label}
+    </div>
   );
 }

@@ -1,11 +1,15 @@
-import { notFound } from "next/navigation";
-import { getProject, getVersion } from "@/lib/data";
+"use client";
+
+import { useParams } from "next/navigation";
+import { GateScreen } from "@/components/ProjectGate";
+import { useProjectPage } from "@/lib/hooks";
 import { RunChecklist } from "./RunChecklist";
 
-export default async function RunPage({ params }: { params: Promise<{ projectId: string; versionId: string }> }) {
-  const { projectId, versionId } = await params;
-  const project = getProject(projectId);
-  const version = project && getVersion(project, versionId);
-  if (!project || !version) notFound();
-  return <RunChecklist project={project} version={version} />;
+export default function RunPage() {
+  const { projectId, versionId } = useParams<{ projectId: string; versionId: string }>();
+  const { data, gate, mutate } = useProjectPage(projectId);
+  if (gate) return <GateScreen gate={gate} onRetry={() => mutate()} />;
+  const version = data!.versions.find((v) => v.id === versionId);
+  if (!version) return <GateScreen gate={{ message: "This version doesn’t exist, or it was deleted." }} />;
+  return <RunChecklist project={data!} version={version} />;
 }

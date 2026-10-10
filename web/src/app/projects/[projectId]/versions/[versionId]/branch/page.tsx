@@ -1,16 +1,25 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useParams } from "next/navigation";
 import { Suspense } from "react";
-import { getProject, getVersion } from "@/lib/data";
+import { GateScreen } from "@/components/ProjectGate";
+import { Loading } from "@/components/ui";
+import { useProjectPage } from "@/lib/hooks";
 import { BranchPicker } from "./BranchPicker";
 
-export default async function BranchPage({ params }: { params: Promise<{ projectId: string; versionId: string }> }) {
-  const { projectId, versionId } = await params;
-  const project = getProject(projectId);
-  const version = project && getVersion(project, versionId);
-  if (!project || !version) notFound();
+function BranchScreen() {
+  const { projectId, versionId } = useParams<{ projectId: string; versionId: string }>();
+  const { data, gate, mutate } = useProjectPage(projectId);
+  if (gate) return <GateScreen gate={gate} onRetry={() => mutate()} />;
+  const version = data!.versions.find((v) => v.id === versionId);
+  if (!version) return <GateScreen gate={{ message: "This version doesn’t exist, or it was deleted." }} />;
+  return <BranchPicker project={data!} version={version} />;
+}
+
+export default function BranchPage() {
   return (
-    <Suspense>
-      <BranchPicker project={project} version={version} />
+    <Suspense fallback={<Loading />}>
+      <BranchScreen />
     </Suspense>
   );
 }

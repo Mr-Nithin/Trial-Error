@@ -1,7 +1,7 @@
-import { projectParams } from "@/lib/data";
+import { mockStaticParams } from "@/lib/backend/mock";
 
 export function generateStaticParams() {
-  return projectParams();
+  return process.env.STATIC_EXPORT === "1" ? mockStaticParams().map(({ projectId }) => ({ projectId })) : [];
 }
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
