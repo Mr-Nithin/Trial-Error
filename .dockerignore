@@ -1,0 +1,17 @@
+# Root build context (used by api/Dockerfile). Keep it small and secret-free.
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/*.log
+
+# api
+api/dist
+api/build
+api/test
+api/coverage
+
+# web
+web/.next
+web/out
+web/next-env.d.ts

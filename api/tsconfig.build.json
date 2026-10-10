@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rootDir": "..",
+    "outDir": "build/tsc",
+    "sourceMap": false,
+    "declaration": false
+  },
+  "include": ["src", "../shared/api-types.ts"],
+  "exclude": ["src/**/*.test.ts"]
+}
